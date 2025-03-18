@@ -98,8 +98,8 @@ export default function Screener() {
         price: quote.regularMarketPrice || 0,
         change: quote.regularMarketChange || 0,
         changePercent: quote.regularMarketChangePercent || 0,
-        volume: (quote.regularMarketVolume || 0) / 1000000, // Convert to millions
-        marketCap: (quote.marketCap || 0) / 1000000000000, // Convert to trillions
+        volume: (quote.regularMarketVolume || 0) / 1000000,
+        marketCap: (quote.marketCap || 0) / 1000000000000,
         peRatio: calculatePE(quote.regularMarketPrice, quote.epsTrailingTwelveMonths),
         favorite: favorites.includes(quote.symbol)
       }));

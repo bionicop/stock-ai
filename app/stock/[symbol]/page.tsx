@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, TrendingUp, DollarSign, BarChart3, Activity, Calendar, Briefcase, LineChart as LC, Info, Newspaper, ChevronRight, TrendingDown, Percent } from "lucide-react";
+import { ArrowLeft, TrendingUp, DollarSign, BarChart3, Activity, Calendar, Briefcase, LineChart as LC, Newspaper, ChevronRight, Percent, AlertCircle, Loader2, Info } from "lucide-react";
 import Link from "next/link";
 import { use } from "react";
 import {
@@ -15,6 +15,7 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts";
 import { fetchStockChartData, fetchStockDetails, fetchStockNews } from "@/lib/yahoo/yahooFinance";
 import { Skeleton } from "@/components/ui/skeleton";
+import StockAnalysisComponent from "@/components/ui/StockAnalysis";
 
 const chartConfig = {
   priceData: {
@@ -40,26 +41,28 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
   const [stockDetails, setStockDetails] = useState<any>(null);
   const [stockNews, setStockNews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [chartRange, setChartRange] = useState<'1mo' | '3mo' | '6mo' | '1y'>('3mo');
 
   useEffect(() => {
     async function loadStockData() {
       try {
         setLoading(true);
+        setError(null);
 
-        // Fetch chart data
-        const chartData = await fetchStockChartData(symbol, chartRange, '1d');
+        // Execute all promises in parallel for better performance
+        const [chartData, details, news] = await Promise.all([
+          fetchStockChartData(symbol, chartRange, '1d'),
+          fetchStockDetails(symbol),
+          fetchStockNews(symbol, 5)
+        ]);
+
         setStockData(chartData);
-
-        // Fetch stock details
-        const details = await fetchStockDetails(symbol);
         setStockDetails(details);
-
-        // Fetch news
-        const news = await fetchStockNews(symbol, 5);
         setStockNews(news);
       } catch (error) {
         console.error("Error fetching stock data:", error);
+        setError("Failed to load stock data. Please try again later.");
       } finally {
         setLoading(false);
       }
@@ -67,6 +70,32 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
 
     loadStockData();
   }, [symbol, chartRange]);
+
+  // Update chart data validation
+  const isValidChartData = stockData && stockData.length > 0 && stockData.some(item => item.close != null);
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="p-4 w-full container mx-auto max-w-7xl">
+        <Button variant="outline" size="sm" asChild className="mb-4">
+          <Link href="/screener">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Screener
+          </Link>
+        </Button>
+        <Card className="p-6">
+          <div className="flex flex-col items-center justify-center text-center">
+            <AlertCircle className="h-10 w-10 text-destructive mb-4" />
+            <h2 className="text-lg font-semibold mb-2">Error Loading Stock Data</h2>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()}>
+              Try Again
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   // If loading, show skeleton UI
   if (loading || !stockDetails) {
@@ -98,14 +127,14 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1">
               <Skeleton className="h-[400px] w-full mb-6" />
-              <Skeleton className="h-[300px] w-full" />
             </div>
             <div className="lg:col-span-2">
               <Skeleton className="h-[300px] w-full mb-6" />
               <Skeleton className="h-[400px] w-full mb-6" />
-              <Skeleton className="h-[300px] w-full" />
             </div>
           </div>
+          <Skeleton className="h-[500px] w-full mb-6" />
+          <Skeleton className="h-[400px] w-full" />
         </div>
       </div>
     );
@@ -121,7 +150,7 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
   const percentInRange = priceRange > 0 ? (currentFromLow / priceRange) * 100 : 50;
 
   return (
-    <div className="p-4 w-full container">
+    <div className="p-4 w-full container mx-auto max-w-7xl">
       {/* Header with back button */}
       <div className="mb-6">
         <Button variant="outline" size="sm" asChild className="mb-4">
@@ -233,11 +262,11 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px] flex items-center justify-center bg-muted/30 rounded-md mb-4">
-              {stockData.length > 0 ? (
+            <div className="h-[350px] flex items-center justify-center bg-muted/30 rounded-md mb-4">
+              {isValidChartData ? (
                 <ChartContainer
                   config={chartConfig}
-                  className="h-[350px] w-full"
+                  className="h-full w-full"
                 >
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart
@@ -254,14 +283,6 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                           <stop offset="5%" stopColor={chartConfig.high.color} stopOpacity={0.2} />
                           <stop offset="95%" stopColor={chartConfig.high.color} stopOpacity={0} />
                         </linearGradient>
-                        <linearGradient id="gradientClose" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={chartConfig.close.color} stopOpacity={0.2} />
-                          <stop offset="95%" stopColor={chartConfig.close.color} stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="gradientLow" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={chartConfig.low.color} stopOpacity={0.2} />
-                          <stop offset="95%" stopColor={chartConfig.low.color} stopOpacity={0} />
-                        </linearGradient>
                       </defs>
                       <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                       <XAxis
@@ -273,18 +294,18 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                         tick={{ fill: '#9ca3af' }}
                       />
                       <YAxis
-                        domain={[minValue * 0.95, maxValue * 1.05]}
+                        domain={['auto', 'auto']}
                         tickLine={false}
                         axisLine={false}
                         tick={{ fill: '#9ca3af' }}
-                        tickFormatter={(value) => `$${value.toFixed(0)}`}
+                        tickFormatter={(value) => `$${value.toFixed(2)}`}
                       />
                       <ChartTooltip
                         content={
                           <ChartTooltipContent
-                            className="bg-gray-900 border-gray-800"
+                            className="bg-muted border-border"
                             labelFormatter={(value) => value}
-                            valueFormatter={(value) => `$${value.toFixed(2)}`}
+                            valueFormatter={(value) => `$${Number(value).toFixed(2)}`}
                           />
                         }
                       />
@@ -294,8 +315,7 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                         stroke={chartConfig.high.color}
                         strokeWidth={2}
                         dot={false}
-                        isAnimationActive={true}
-                        activeDot={{ r: 6, strokeWidth: 2 }}
+                        activeDot={{ r: 4 }}
                       />
                       <Line
                         type="monotone"
@@ -303,8 +323,7 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                         stroke={chartConfig.close.color}
                         strokeWidth={2}
                         dot={false}
-                        isAnimationActive={true}
-                        activeDot={{ r: 6, strokeWidth: 2 }}
+                        activeDot={{ r: 4 }}
                       />
                       <Line
                         type="monotone"
@@ -312,15 +331,22 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                         stroke={chartConfig.low.color}
                         strokeWidth={2}
                         dot={false}
-                        isAnimationActive={true}
-                        activeDot={{ r: 6, strokeWidth: 2 }}
+                        activeDot={{ r: 4 }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
                 </ChartContainer>
               ) : (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-muted-foreground">No chart data available</p>
+                <div className="flex flex-col items-center justify-center text-muted-foreground">
+                  <p>No chart data available</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => loadStockData()}
+                  >
+                    Retry
+                  </Button>
                 </div>
               )}
             </div>
@@ -345,7 +371,7 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
         </Card>
 
         {/* Main content grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           {/* Left column - Company Info */}
           <div className="lg:col-span-1 space-y-6">
             <Card>
@@ -378,45 +404,26 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                   {stockDetails.description && (
                     <div className="pt-4 border-t">
                       <h3 className="font-medium mb-2">About {stockDetails.name}</h3>
-                      <p className="text-sm text-muted-foreground">{stockDetails.description}</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <Newspaper className="h-5 w-5" /> Recent News
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {stockNews.length > 0 ? stockNews.map((item, index) => (
-                    <div key={index} className={index < stockNews.length - 1 ? "border-b pb-4" : ""}>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                        <Calendar className="h-4 w-4" />
-                        <span>{item.time || 'N/A'}</span>
-                        <span className={`px-1.5 py-0.5 text-xs rounded-full ${
-                          item.impact === 'high' ? 'bg-red-900/30 text-red-500' :
-                          item.impact === 'medium' ? 'bg-orange-900/30 text-orange-500' :
-                          'bg-blue-900/30 text-blue-500'
-                        }`}>
-                          {item.impact === 'high' ? 'High' :
-                           item.impact === 'medium' ? 'Medium' : 'Low'} Impact
-                        </span>
+                      <div className="text-sm text-muted-foreground">
+                        {stockDetails.description && stockDetails.description.length > 300 ? (
+                          <div>
+                            <p>{stockDetails.description.slice(0, 300)}
+                              <Button
+                                variant="link"
+                                className="px-1 h-auto text-xs"
+                                onClick={() => {
+                                  const fullDesc = stockDetails.description;
+                                  window.alert(fullDesc);
+                                }}
+                              >
+                                ...show more
+                              </Button>
+                            </p>
+                          </div>
+                        ) : (
+                          <p>{stockDetails.description}</p>
+                        )}
                       </div>
-                      <h3 className="font-medium text-sm">{item.title}</h3>
-                      {item.url && (
-                        <Button variant="link" className="p-0 h-auto text-sm" onClick={() => window.open(item.url, '_blank')}>
-                          Read more <ChevronRight className="h-3 w-3 ml-1" />
-                        </Button>
-                      )}
-                    </div>
-                  )) : (
-                    <div className="text-center py-6 text-muted-foreground">
-                      No recent news available for this stock.
                     </div>
                   )}
                 </div>
@@ -498,10 +505,6 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                           ({((1 - stockDetails.price / stockDetails.yearHigh) * 100).toFixed(2)}%)
                         </span>
                       </div>
-
-                      <div className="h-24 bg-muted/30 rounded-md mt-4 flex items-center justify-center">
-                        <p className="text-muted-foreground text-sm">Additional metrics coming soon</p>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -544,57 +547,68 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                     ) : null}
                   </div>
                 </div>
-
-                <div className="mt-6">
-                  <h3 className="font-medium mb-3">Volume History</h3>
-                  {stockData.length > 0 ? (
-                    <div className="h-[200px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
-                          data={stockData.filter(item => item.volume)}
-                          margin={{
-                            top: 20,
-                            right: 20,
-                            left: 20,
-                            bottom: 10,
-                          }}
-                        >
-                          <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                          <XAxis
-                            dataKey="date"
-                            tickLine={false}
-                            axisLine={false}
-                            tickMargin={8}
-                            minTickGap={32}
-                            tick={{ fill: '#9ca3af' }}
-                          />
-                          <YAxis
-                            tickLine={false}
-                            axisLine={false}
-                            tick={{ fill: '#9ca3af' }}
-                            tickFormatter={(value) => `${value}M`}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="volume"
-                            stroke="#3b82f6"
-                            strokeWidth={2}
-                            dot={false}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ) : (
-                    <div className="h-[200px] flex items-center justify-center bg-muted/30 rounded-md">
-                      <p className="text-muted-foreground text-sm">No volume data available</p>
-                    </div>
-                  )}
-                </div>
               </CardContent>
             </Card>
           </div>
         </div>
+
+        {/* Full-width AI Stock Analysis */}
+        <div className="mb-6">
+          <StockAnalysisComponent
+            symbol={symbol}
+            investmentHorizon="medium"
+            riskTolerance="moderate"
+          />
+        </div>
+
+        {/* Full-width Recent News */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Newspaper className="h-5 w-5" /> Recent News
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {stockNews.length > 0 ? stockNews.map((item, index) => (
+                <div key={index} className={index < stockNews.length - 1 ? "border-b pb-4" : ""}>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                    <Calendar className="h-4 w-4" />
+                    <span>{item.time || 'N/A'}</span>
+                    <span className={`px-1.5 py-0.5 text-xs rounded-full ${
+                      item.impact === 'high' ? 'bg-red-900/30 text-red-500' :
+                      item.impact === 'medium' ? 'bg-orange-900/30 text-orange-500' :
+                      'bg-blue-900/30 text-blue-500'
+                    }`}>
+                      {item.impact === 'high' ? 'High' :
+                       item.impact === 'medium' ? 'Medium' : 'Low'} Impact
+                    </span>
+                  </div>
+                  <h3 className="font-medium text-sm">{item.title}</h3>
+                  {item.url && (
+                    <Button variant="link" className="p-0 h-auto text-sm" onClick={() => window.open(item.url, '_blank')}>
+                      Read more <ChevronRight className="h-3 w-3 ml-1" />
+                    </Button>
+                  )}
+                </div>
+              )) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  No recent news available for this stock.
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {loading && (
+        <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm">Loading...</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

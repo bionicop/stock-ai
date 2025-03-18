@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search as SearchIcon, X, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart2, Globe, History, Trash2 } from "lucide-react";
+import { Search as SearchIcon, X, Clock, ChevronLeft, ChevronRight, TrendingUp, BarChart2, Globe, History, Trash2, Bitcoin } from "lucide-react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,6 +25,12 @@ interface SearchProps {
   onSearchStateChange?: (isSearching: boolean) => void;
 }
 
+interface TrendingData {
+  trending: any[];
+  indices: any[];
+  crypto: any[];
+}
+
 export default function Search({ expanded = false, onSearchStateChange }: SearchProps) {
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebounce(query, 300);
@@ -35,6 +41,8 @@ export default function Search({ expanded = false, onSearchStateChange }: Search
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showHistory, setShowHistory] = useState(false);
+  const [trendingData, setTrendingData] = useState<TrendingData | null>(null);
+  const [isTrendingLoading, setIsTrendingLoading] = useState(true);
   const resultsPerPage = 5;
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -67,6 +75,13 @@ export default function Search({ expanded = false, onSearchStateChange }: Search
   useEffect(() => {
     setCurrentPage(1);
   }, [debouncedQuery, activeTab]);
+
+  // Fetch trending data when not expanded
+  useEffect(() => {
+    if (!isExpanded) {
+      fetchTrendingData();
+    }
+  }, [isExpanded]);
 
   // Function to handle search
   const performSearch = async (searchQuery: string, category: string) => {
@@ -129,6 +144,19 @@ export default function Search({ expanded = false, onSearchStateChange }: Search
     } catch (error) {
       console.error('Error fetching search results:', error);
       return [];
+    }
+  };
+
+  // Function to fetch trending data
+  const fetchTrendingData = async () => {
+    try {
+      setIsTrendingLoading(true);
+      const response = await axios.get('/api/yahoo-finance/trending');
+      setTrendingData(response.data);
+    } catch (error) {
+      console.error('Error fetching trending data:', error);
+    } finally {
+      setIsTrendingLoading(false);
     }
   };
 
@@ -225,7 +253,7 @@ export default function Search({ expanded = false, onSearchStateChange }: Search
   };
 
   return (
-    <div className={`mx-auto w-full transition-all duration-300 ${isExpanded ? 'max-w-3xl' : 'max-w-2xl'}`}>
+    <div className={`mx-auto w-full transition-all duration-300 ${isExpanded ? 'max-w-3xl' : 'max-w-5xl'}`}>
       <div className="relative">
         <div className="relative rounded-full border shadow-sm">
           <Input
@@ -344,7 +372,7 @@ export default function Search({ expanded = false, onSearchStateChange }: Search
                     </div>
                   ) : getCurrentPageItems().length > 0 ? (
                     <div className="space-y-2">
-                      {getCurrentPageItems().map((item, index) => (
+                      {(results || []).map((item, index) => (
                         <div
                           key={index}
                           className="cursor-pointer rounded-md p-3 hover:bg-accent"
@@ -436,6 +464,90 @@ export default function Search({ expanded = false, onSearchStateChange }: Search
             </Tabs>
           </Card>
         ))}
+
+        {/* Add Quick Market Overview */}
+        {!isExpanded && (
+          <div className="mt-8 grid gap-6 animate-fade-in">
+            {/* Market Indices */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {isTrendingLoading ? (
+                Array(3).fill(0).map((_, i) => (
+                  <Skeleton key={i} className="h-24 rounded-lg" />
+                ))
+              ) : trendingData?.indices.map((index) => (
+                <div
+                  key={index.symbol}
+                  className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{index.shortName}</span>
+                    <span className={`text-sm ${index.regularMarketChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {index.regularMarketChange >= 0 ? '+' : ''}{index.regularMarketChangePercent.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold">
+                    {index.regularMarketPrice.toFixed(2)}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Trending Stocks */}
+            <div className="mt-6">
+              <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" /> Trending Stocks
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {isTrendingLoading ? (
+                  Array(5).fill(0).map((_, i) => (
+                    <Skeleton key={i} className="h-24 rounded-lg" />
+                  ))
+                ) : trendingData?.trending.slice(0, 5).map((stock) => (
+                  <button
+                    key={stock.symbol}
+                    onClick={() => router.push(`/stock/${stock.symbol}`)}
+                    className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors text-left"
+                  >
+                    <div className="font-medium">{stock.symbol}</div>
+                    <div className="text-sm text-muted-foreground truncate">{stock.shortName}</div>
+                    <div className={`mt-2 text-sm ${stock.regularMarketChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {stock.regularMarketChange >= 0 ? '+' : ''}{stock.regularMarketChangePercent.toFixed(2)}%
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Top Crypto */}
+            <div className="mt-6">
+              <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+                <Bitcoin className="h-5 w-5" /> Crypto Highlights
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                {isTrendingLoading ? (
+                  Array(2).fill(0).map((_, i) => (
+                    <Skeleton key={i} className="h-24 rounded-lg" />
+                  ))
+                ) : trendingData?.crypto.map((crypto) => (
+                  <div
+                    key={crypto.symbol}
+                    className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{crypto.shortName}</span>
+                      <span className={`text-sm ${crypto.regularMarketChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {crypto.regularMarketChange >= 0 ? '+' : ''}{crypto.regularMarketChangePercent.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold">
+                      ${crypto.regularMarketPrice.toFixed(2)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

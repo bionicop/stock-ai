@@ -10,26 +10,63 @@ export async function fetchStockDetails(symbol: string) {
     }
 
     const data = await response.json();
-
-    // Format the stock details
     return {
+      // Basic Information
       symbol: data.quote.symbol,
       name: data.quote.longName || data.quote.shortName || data.quote.symbol,
       price: data.quote.regularMarketPrice,
       change: data.quote.regularMarketChange || 0,
       changePercent: data.quote.regularMarketChangePercent || 0,
+
+      // Volume Metrics
       volume: (data.quote.regularMarketVolume || 0) / 1000000,
+      avgVolume: (data.quote.averageDailyVolume10Day || 0) / 1000000,
+      avgVolume3Month: (data.quote.averageDailyVolume3Month || 0) / 1000000,
+
+      // Valuation Metrics
       marketCap: (data.quote.marketCap || 0) / 1000000000000,
       peRatio: data.quote.trailingPE || 0,
-      sector: data.profile?.sector || 'Unknown',
-      industry: data.profile?.industry || 'Unknown',
+      forwardPE: data.quote.forwardPE || 0,
+      priceToBook: data.quote.priceToBook || 0,
+      priceToSales: data.quote.priceToSales || 0,
+
+      // Financial Metrics
+      eps: data.quote.epsTrailingTwelveMonths || 0,
+      forwardEps: data.quote.forwardEps || 0,
+      epsGrowth: data.quote.epsCurrentYear || 0,
+      revenue: (data.quote.totalRevenue || 0) / 1000000000,
+      profitMargin: data.quote.profitMargins || 0,
+
+      // Technical Indicators
       beta: data.quote.beta || 0,
-      avgVolume: (data.quote.averageDailyVolume10Day || 0) / 1000000,
+      rsi: data.quote.rsi || 0,
+      fiftyDayAverage: data.quote.fiftyDayAverage || 0,
+      twoHundredDayAverage: data.quote.twoHundredDayAverage || 0,
+
+      // Price Ranges
       yearHigh: data.quote.fiftyTwoWeekHigh || 0,
       yearLow: data.quote.fiftyTwoWeekLow || 0,
+      dayHigh: data.quote.regularMarketDayHigh || 0,
+      dayLow: data.quote.regularMarketDayLow || 0,
+
+      // Dividend Information
       dividendYield: data.quote.dividendYield ? data.quote.dividendYield * 100 : 0,
-      eps: data.quote.epsTrailingTwelveMonths || 0,
-      description: data.profile?.longBusinessSummary || ''
+      dividendRate: data.quote.dividendRate || 0,
+      exDividendDate: data.quote.exDividendDate || null,
+
+      // Company Information
+      sector: data.profile?.sector || 'Unknown',
+      industry: data.profile?.industry || 'Unknown',
+      description: data.profile?.longBusinessSummary || '',
+      employees: data.profile?.fullTimeEmployees || 0,
+      country: data.profile?.country || 'Unknown',
+
+      // Analyst Ratings
+      recommendationMean: data.quote.recommendationMean || 0,
+      numberOfAnalystOpinions: data.quote.numberOfAnalystOpinions || 0,
+      targetHighPrice: data.quote.targetHighPrice || 0,
+      targetLowPrice: data.quote.targetLowPrice || 0,
+      targetMedianPrice: data.quote.targetMedianPrice || 0
     };
   } catch (error) {
     console.error('Error fetching stock details:', error);
@@ -50,31 +87,43 @@ export async function fetchStockChartData(symbol: string, range = '3mo', interva
 
     const data = await response.json();
 
-    // Format chart data
-    if (!data.chart || !data.chart.result || data.chart.result.length === 0) {
-      return [];
+    // Handle the new API response structure
+    if (data.quotes && Array.isArray(data.quotes)) {
+      // New structure with direct quotes array
+      return data.quotes.map((quote: any, i: number) => ({
+        date: new Date(quote.timestamp * 1000).toLocaleDateString(),
+        timestamp: quote.timestamp,
+        high: quote.high || quote.close,
+        low: quote.low || quote.close,
+        close: quote.close,
+        volume: quote.volume ? quote.volume / 1000000 : 0
+      })).filter((item: any) => item.close != null);
     }
 
-    const result = data.chart.result[0];
-    const timestamps = result.timestamp || [];
-    const quotes = result.indicators.quote[0] || {};
-    const chartData = [];
+    // Fallback to the old structure if available
+    if (data.chart?.result?.[0]) {
+      const result = data.chart.result[0];
+      const timestamps = result.timestamp || [];
+      const quotes = result.indicators.quote[0] || {};
 
-    for (let i = 0; i < timestamps.length; i++) {
-      if (!quotes.close || quotes.close[i] === null) continue;
+      // Validate required data
+      if (!timestamps.length || !quotes.close) {
+        console.error('Missing required chart data');
+        return [];
+      }
 
-      chartData.push({
-        date: new Date(timestamps[i] * 1000).toLocaleDateString(),
-        timestamp: timestamps[i],
-        open: quotes.open[i],
-        high: quotes.high[i],
-        low: quotes.low[i],
+      return timestamps.map((timestamp: number, i: number) => ({
+        date: new Date(timestamp * 1000).toLocaleDateString(),
+        timestamp,
+        high: quotes.high?.[i] || quotes.close[i],
+        low: quotes.low?.[i] || quotes.close[i],
         close: quotes.close[i],
-        volume: quotes.volume ? quotes.volume[i] / 1000000 : 0 // Convert to millions
-      });
+        volume: quotes.volume?.[i] ? quotes.volume[i] / 1000000 : 0
+      })).filter(item => item.close != null);
     }
 
-    return chartData;
+    console.error('Invalid chart data structure:', data);
+    return [];
   } catch (error) {
     console.error('Error fetching stock chart data:', error);
     return [];

@@ -332,8 +332,6 @@ export default function StockDetailDialog({ isOpen, onClose, symbol }: StockDeta
                         <div className="text-xs text-muted-foreground">Current Volume</div>
                         <div className="text-sm">{stock.volume.toFixed(1)}M</div>
                       </div>
-
-                      {/* Add more metrics here */}
                       <div>
                         <div className="text-xs text-muted-foreground">Market Cap</div>
                         <div className="text-sm">

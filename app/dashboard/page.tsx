@@ -1,103 +1,73 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell,
-} from 'recharts';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Search, Star, StarOff } from "lucide-react";
-
-
-
-const mockNewsData = [
-  {
-    id: 1,
-    title: "Fed signals potential rate cuts in coming months",
-    source: "Financial Times",
-    time: "2 hours ago",
-    impact: "high",
-  },
-  {
-    id: 2,
-    title: "Tech stocks rally on earnings beats",
-    source: "Wall Street Journal",
-    time: "4 hours ago",
-    impact: "medium",
-  },
-  {
-    id: 3,
-    title: "Oil prices stabilize following OPEC meeting",
-    source: "Bloomberg",
-    time: "6 hours ago",
-    impact: "medium",
-  },
-  {
-    id: 4,
-    title: "Retail sales exceed expectations in Q2",
-    source: "CNBC",
-    time: "12 hours ago",
-    impact: "low",
-  },
-];
-
-const mockSectorPerformance = [
-  { name: "Technology", value: 4.2, color: "hsl(var(--chart-1))" },
-  { name: "Healthcare", value: 2.1, color: "hsl(var(--chart-2))" },
-  { name: "Energy", value: -1.8, color: "hsl(var(--chart-3))" },
-  { name: "Financials", value: 3.5, color: "hsl(var(--chart-4))" },
-  { name: "Consumer", value: 0.7, color: "hsl(var(--chart-5))" },
-];
-
-const mockTickers = [
-  { symbol: "AAPL", name: "Apple Inc.", price: 182.63, change: 1.25, changePercent: 0.69, favorite: true },
-  { symbol: "MSFT", name: "Microsoft Corp.", price: 378.92, change: 2.45, changePercent: 0.65, favorite: true },
-  { symbol: "GOOGL", name: "Alphabet Inc.", price: 142.17, change: -0.83, changePercent: -0.58, favorite: false },
-  { symbol: "AMZN", name: "Amazon.com Inc.", price: 145.24, change: 1.18, changePercent: 0.82, favorite: true },
-  { symbol: "META", name: "Meta Platforms Inc.", price: 465.20, change: -2.34, changePercent: -0.50, favorite: false },
-  { symbol: "TSLA", name: "Tesla Inc.", price: 191.59, change: 4.76, changePercent: 2.55, favorite: false },
-  { symbol: "NVDA", name: "NVIDIA Corp.", price: 795.18, change: 12.43, changePercent: 1.59, favorite: true },
-  { symbol: "BRK.B", name: "Berkshire Hathaway", price: 408.77, change: 0.56, changePercent: 0.14, favorite: false },
-];
+} from "recharts";
+import {
+  TrendingUp,
+  BarChart3,
+  ArrowUpRight,
+  ArrowDownRight,
+  Clock,
+  ChevronRight,
+  Newspaper,
+  RefreshCw,
+} from "lucide-react";
 
 export default function Dashboard() {
-  const [userEmail, setUserEmail] = useState("user@example.com");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [tickers, setTickers] = useState(mockTickers);
-  const [activeTab, setActiveTab] = useState("all");
+  const [marketData, setMarketData] = useState<any>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const supabase = createClientComponentClient();
+  const [username, setUsername] = useState<string>("");
 
-  // Function to toggle favorite status
-  const toggleFavorite = (symbol) => {
-    setTickers(tickers.map(ticker =>
-      ticker.symbol === symbol ? {...ticker, favorite: !ticker.favorite} : ticker
-    ));
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        // Fetch market data
+        const marketResponse = await fetch('/api/yahoo-finance/market');
+        const marketData = await marketResponse.json();
+
+        // Get user info
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.email) {
+          setUsername(user.email.split('@')[0]);
+        }
+
+        setMarketData(marketData);
+      } catch (error) {
+        console.error('Error fetching market data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Format market time
+  const formatMarketTime = () => {
+    return new Date().toLocaleString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
-
-  // Filter tickers based on search and active tab
-  const filteredTickers = tickers
-    .filter(ticker =>
-      ticker.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ticker.name.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    .filter(ticker => activeTab === "all" || (activeTab === "favorites" && ticker.favorite));
-
-  // Sort tickers to show favorites first
-  const sortedTickers = [...filteredTickers].sort((a, b) => {
-    // Sort by favorite status first (favorites on top)
-    if (a.favorite && !b.favorite) return -1;
-    if (!a.favorite && b.favorite) return 1;
-    return 0;
-  });
 
   return (
     <div className="p-6 w-full">
@@ -105,164 +75,183 @@ export default function Dashboard() {
         {/* Welcome section */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Welcome back, {userEmail}</h1>
-            <p className="text-muted-foreground">Here's what's happening in the market today.</p>
+            <h1 className="text-3xl font-bold">Welcome {username ? `, ${username}` : 'to Stock AI'}</h1>
+            <p className="text-muted-foreground">Here's your market overview</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="bg-primary/10 text-primary">
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className="bg-primary/10 text-primary flex items-center gap-1">
+              <span className="h-2 w-2 rounded-full bg-green-500"></span>
               Market Open
             </Badge>
-            <span className="text-sm text-muted-foreground">Last updated: {new Date().toLocaleTimeString()}</span>
+            <span className="text-sm text-muted-foreground flex items-center gap-1">
+              <Clock className="h-3.5 w-3.5" /> {formatMarketTime()}
+            </span>
+            <Button variant="ghost" size="icon" onClick={() => window.location.reload()}>
+              <RefreshCw className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
-        {/* Market Overview */}
+        {/* Market Indices Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {isLoading ? (
+            Array(4).fill(0).map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <CardContent className="p-4">
+                  <div className="h-4 w-24 bg-muted rounded mb-2"></div>
+                  <div className="h-6 w-20 bg-muted rounded mb-1"></div>
+                  <div className="h-4 w-16 bg-muted rounded"></div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            marketData?.indices?.map((index: any, i: number) => (
+              <Card key={i}>
+                <CardContent className="p-4">
+                  <div className="text-sm font-medium mb-1">{index.shortName}</div>
+                  <div className="text-xl font-semibold">${index.price?.toFixed(2)}</div>
+                  <div className={`flex items-center text-sm ${index.changePercent >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                    {index.changePercent >= 0 ?
+                      <ArrowUpRight className="h-3.5 w-3.5 mr-1" /> :
+                      <ArrowDownRight className="h-3.5 w-3.5 mr-1" />
+                    }
+                    {index.changePercent?.toFixed(2)}%
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+
+        {/* Main content grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Market Trends */}
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Market Overview</CardTitle>
-              <CardDescription>Performance by sector and index trends</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" /> Market Trends
+              </CardTitle>
             </CardHeader>
             <CardContent>
-                  <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={mockSectorPerformance} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
-                        <XAxis type="number" className="text-muted-foreground" />
-                        <YAxis dataKey="name" type="category" className="text-muted-foreground" width={80} />
-                        <Tooltip
-                          contentStyle={{ background: 'hsl(var(--card))', border: 'none' }}
-                          formatter={(value) => [`${value}%`, 'Change']}
-                        />
-                        <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                          {mockSectorPerformance.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                    {mockSectorPerformance.map((sector) => (
-                      <div key={sector.name} className="text-center">
-                        <div className="text-sm font-medium">{sector.name}</div>
-                        <div className={`text-base font-semibold ${sector.value >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                          {sector.value > 0 ? '+' : ''}{sector.value}%
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={marketData.trending || []}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="time" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        borderColor: 'hsl(var(--border))'
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="price"
+                      stroke="hsl(var(--primary))"
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
 
           {/* Market News */}
-          <Card className="lg:col-span-1">
+          <Card>
             <CardHeader>
-              <CardTitle>Market News</CardTitle>
-              <CardDescription>Latest financial news and updates</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Newspaper className="h-5 w-5" /> Market News
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {mockNewsData.map(news => (
-                <div key={news.id} className="border-b pb-3 last:border-b-0 last:pb-0">
-                  <h3 className="font-medium hover:text-primary cursor-pointer">{news.title}</h3>
-                  <div className="flex justify-between items-center mt-1">
-                    <span className="text-sm text-muted-foreground">{news.source}</span>
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant="outline"
-                        className={`text-xs ${
-                          news.impact === 'high' ? 'bg-destructive/10 text-destructive' :
-                          news.impact === 'medium' ? 'bg-amber-500/10 text-amber-500' :
-                          'bg-emerald-500/10 text-emerald-500'
-                        }`}
-                      >
-                        {news.impact}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">{news.time}</span>
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {isLoading ? (
+                  Array(5).fill(0).map((_, i) => (
+                    <div key={i} className="p-4 animate-pulse">
+                      <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
+                      <div className="h-3 bg-muted rounded w-1/4"></div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                  ))
+                ) : (
+                  marketData?.news?.map((item: any, i: number) => (
+                    <div key={i} className="p-4 hover:bg-muted/50">
+                      <h3 className="text-sm font-medium line-clamp-2 hover:text-primary cursor-pointer">
+                        {item.title}
+                      </h3>
+                      <div className="flex justify-between items-center mt-1">
+                        <span className="text-xs text-muted-foreground">{item.publisher}</span>
+                        <Button variant="ghost" size="sm" className="h-auto py-1" asChild>
+                          <Link href={item.link} target="_blank">
+                            Read <ChevronRight className="h-3 w-3 ml-1" />
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Ticker section */}
-        <Card>
-          <CardHeader className="flex flex-col sm:flex-row justify-between sm:items-center space-y-2 sm:space-y-0">
-            <div>
-              <CardTitle>Stocks</CardTitle>
-              <CardDescription>Track your favorite stocks and market movers</CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search symbols or names"
-                  className="pl-8 w-[200px] sm:w-[260px]"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+        {/* Bottom Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Market Movers */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" /> Market Movers
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {isLoading ? (
+                  Array(5).fill(0).map((_, i) => (
+                    <div key={i} className="p-4 animate-pulse">
+                      <div className="flex justify-between">
+                        <div className="space-y-2">
+                          <div className="h-4 bg-muted rounded w-16"></div>
+                          <div className="h-3 bg-muted rounded w-24"></div>
+                        </div>
+                        <div className="space-y-2 text-right">
+                          <div className="h-4 bg-muted rounded w-20"></div>
+                          <div className="h-3 bg-muted rounded w-12"></div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  marketData?.trending?.slice(0, 5).map((stock: any, i: number) => (
+                    <Link href={`/stock/${stock.symbol}`} key={i}>
+                      <div className="p-4 hover:bg-muted/50">
+                        <div className="flex justify-between">
+                          <div>
+                            <div className="font-medium">{stock.symbol}</div>
+                            <div className="text-sm text-muted-foreground">{stock.shortName}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-medium">${stock.price?.toFixed(2)}</div>
+                            <div className={`text-sm ${stock.changePercent >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                              {stock.changePercent >= 0 ? '+' : ''}{stock.changePercent?.toFixed(2)}%
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  ))
+                )}
               </div>
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-[200px]">
-                <TabsList>
-                  <TabsTrigger value="all">All</TabsTrigger>
-                  <TabsTrigger value="favorites">Favorites</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="border rounded-lg overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-muted/50">
-                      <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Symbol</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Name</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">Price</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">Change</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">% Change</th>
-                      <th className="px-4 py-3 text-center text-sm font-medium text-muted-foreground">Favorite</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {sortedTickers.map((ticker) => (
-                      <tr key={ticker.symbol} className="hover:bg-muted/50">
-                        <td className="px-4 py-3 text-left font-medium">{ticker.symbol}</td>
-                        <td className="px-4 py-3 text-left text-muted-foreground">{ticker.name}</td>
-                        <td className="px-4 py-3 text-right font-medium">${ticker.price.toFixed(2)}</td>
-                        <td className={`px-4 py-3 text-right ${ticker.change >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                          {ticker.change > 0 ? '+' : ''}{ticker.change.toFixed(2)}
-                        </td>
-                        <td className={`px-4 py-3 text-right ${ticker.changePercent >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                          {ticker.changePercent > 0 ? '+' : ''}{ticker.changePercent.toFixed(2)}%
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => toggleFavorite(ticker.symbol)}
-                            className={ticker.favorite ? 'text-amber-400 hover:text-amber-500' : 'text-muted-foreground hover:text-foreground'}
-                          >
-                            {ticker.favorite ? <Star className="h-4 w-4 fill-current" /> : <StarOff className="h-4 w-4" />}
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                    {sortedTickers.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
-                          No tickers found. Try adjusting your search.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+            <CardFooter>
+              <Button variant="outline" size="sm" className="w-full" asChild>
+                <Link href="/screener">
+                  View All Stocks <ChevronRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
     </div>
   );

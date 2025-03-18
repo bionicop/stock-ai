@@ -15,21 +15,14 @@ import {
 } from "@/components/ui/sidebar"
 import {
   PieChart,
-  LineChart,
-  BarChart,
-  TrendingUp,
-  Star,
-  Search,
-  AlertCircle,
-  Briefcase,
-  Settings
+  Search
 } from "lucide-react"
 
-// Enhanced data with more stock market options
 const data = {
   navMain: [
     {
       title: "Stock Sizzle 9000",
+      url: "/",
       items: [
         {
           title: "Dashboard",
@@ -40,26 +33,6 @@ const data = {
           title: "Stock Screener",
           url: "/screener",
           icon: Search,
-        },
-        {
-          title: "Stocks",
-          url: "/stocks",
-          icon: TrendingUp,
-        },
-        {
-          title: "Watchlist",
-          url: "/watchlist",
-          icon: Star,
-        },
-        {
-          title: "Alerts",
-          url: "/alerts",
-          icon: AlertCircle,
-        },
-        {
-          title: "Settings",
-          url: "/settings",
-          icon: Settings,
         },
       ],
     },
@@ -73,7 +46,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarTrigger />
       </SidebarHeader>
       <SidebarContent>
-        {/* We create a SidebarGroup for each parent. */}
         {data.navMain.map((group) => (
           <SidebarGroup key={group.title}>
             <SidebarGroupLabel>{group.title}</SidebarGroupLabel>

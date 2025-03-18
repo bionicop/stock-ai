@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import yahooFinance from 'yahoo-finance2';
-import { SCREENER_OPTIONS, DEFAULT_SCREENER } from '@/lib/yahoo/constants';
+
+const DEFAULT_SCREENER = "most_actives";
 
 export async function POST(request: Request) {
   try {
