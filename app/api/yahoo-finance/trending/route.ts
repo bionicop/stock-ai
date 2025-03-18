@@ -11,8 +11,6 @@ interface MarketQuote {
 
 export async function GET() {
   try {
-    // Fetch most active stocks
-    const mostActive = await yahooFinance.quote('^GSPC');
     const trendingSymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA'];
 
     // Fetch trending stocks

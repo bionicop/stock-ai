@@ -8,7 +8,7 @@ export default function ForgotPasswordPage() {
         <div className="flex flex-col items-center justify-center gap-2 px-4 text-center sm:px-16">
           <h3 className="text-2xl font-bold text-foreground">Reset Password</h3>
           <p className="text-sm text-muted-foreground">
-            Enter your email address and we'll send you a link to reset your password
+            Enter your email address and we&apos;ll send you a link to reset your password
           </p>
         </div>
         <AuthForm mode="forgot-password" />

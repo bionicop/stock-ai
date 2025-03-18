@@ -44,35 +44,37 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
   const [error, setError] = useState<string | null>(null);
   const [chartRange, setChartRange] = useState<'1mo' | '3mo' | '6mo' | '1y'>('3mo');
 
-  useEffect(() => {
-    async function loadStockData() {
-      try {
-        setLoading(true);
-        setError(null);
+  const loadStockData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-        // Execute all promises in parallel for better performance
-        const [chartData, details, news] = await Promise.all([
-          fetchStockChartData(symbol, chartRange, '1d'),
-          fetchStockDetails(symbol),
-          fetchStockNews(symbol, 5)
-        ]);
+      // Execute all promises in parallel for better performance
+      const [chartData, details, news] = await Promise.all([
+        fetchStockChartData(symbol, chartRange, '1d'),
+        fetchStockDetails(symbol),
+        fetchStockNews(symbol, 5)
+      ]);
 
-        setStockData(chartData);
-        setStockDetails(details);
-        setStockNews(news);
-      } catch (error) {
-        console.error("Error fetching stock data:", error);
-        setError("Failed to load stock data. Please try again later.");
-      } finally {
-        setLoading(false);
-      }
+      setStockData(chartData);
+      setStockDetails(details);
+      setStockNews(news);
+    } catch (error) {
+      console.error("Error fetching stock data:", error);
+      setError("Failed to load stock data. Please try again later.");
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
     loadStockData();
   }, [symbol, chartRange]);
 
   // Update chart data validation
-  const isValidChartData = stockData && stockData.length > 0 && stockData.some(item => item.close != null);
+  const isValidChartData = stockData && stockData.length > 0 && stockData.some(item =>
+    item.close != null && item.high != null && item.low != null && item.date
+  );
 
   // Show error state
   if (error) {

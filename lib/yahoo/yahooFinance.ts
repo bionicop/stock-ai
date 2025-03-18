@@ -74,6 +74,20 @@ export async function fetchStockDetails(symbol: string) {
   }
 }
 
+// Add this helper function
+function formatChartDate(timestamp: Date | string | number): string {
+  try {
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) {
+      throw new Error('Invalid date');
+    }
+    return date.toLocaleDateString();
+  } catch (error) {
+    console.warn('Invalid timestamp:', timestamp);
+    return '';
+  }
+}
+
 /**
  * Fetch chart data for a stock
  */
@@ -89,15 +103,18 @@ export async function fetchStockChartData(symbol: string, range = '3mo', interva
 
     // Handle the new API response structure
     if (data.quotes && Array.isArray(data.quotes)) {
-      // New structure with direct quotes array
-      return data.quotes.map((quote: any, i: number) => ({
-        date: new Date(quote.timestamp * 1000).toLocaleDateString(),
-        timestamp: quote.timestamp,
-        high: quote.high || quote.close,
-        low: quote.low || quote.close,
-        close: quote.close,
-        volume: quote.volume ? quote.volume / 1000000 : 0
-      })).filter((item: any) => item.close != null);
+      return data.quotes
+        .map((quote: any) => {
+          if (!quote.date || !quote.close) return null;
+          return {
+            date: formatChartDate(quote.date),
+            high: quote.high || quote.close,
+            low: quote.low || quote.close,
+            close: quote.close,
+            volume: quote.volume ? quote.volume / 1000000 : 0
+          };
+        })
+        .filter((item: any) => item && item.date && item.close != null);
     }
 
     // Fallback to the old structure if available
@@ -106,20 +123,24 @@ export async function fetchStockChartData(symbol: string, range = '3mo', interva
       const timestamps = result.timestamp || [];
       const quotes = result.indicators.quote[0] || {};
 
-      // Validate required data
       if (!timestamps.length || !quotes.close) {
         console.error('Missing required chart data');
         return [];
       }
 
-      return timestamps.map((timestamp: number, i: number) => ({
-        date: new Date(timestamp * 1000).toLocaleDateString(),
-        timestamp,
-        high: quotes.high?.[i] || quotes.close[i],
-        low: quotes.low?.[i] || quotes.close[i],
-        close: quotes.close[i],
-        volume: quotes.volume?.[i] ? quotes.volume[i] / 1000000 : 0
-      })).filter(item => item.close != null);
+      return timestamps
+        .map((timestamp: number, i: number) => {
+          if (!timestamp || !quotes.close[i]) return null;
+          return {
+            date: formatChartDate(timestamp),
+            timestamp,
+            high: quotes.high?.[i] || quotes.close[i],
+            low: quotes.low?.[i] || quotes.close[i],
+            close: quotes.close[i],
+            volume: quotes.volume?.[i] ? quotes.volume[i] / 1000000 : 0
+          };
+        })
+        .filter((item: any) => item && item.date && item.close != null);
     }
 
     console.error('Invalid chart data structure:', data);

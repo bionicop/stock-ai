@@ -41,13 +41,37 @@ interface AnalystOpinion {
 }
 
 interface DetailedData {
-  fundamentals: Record<string, any>;
-  technicals: Record<string, any>;
-  sentiment: Record<string, any>;
+  fundamentals: {
+    returnOnEquity?: string;
+    profitMargins?: string;
+    revenueGrowth?: string;
+    earningsGrowth?: string;
+    debtToEquity?: string;
+    currentRatio?: string;
+    quickRatio?: string;
+    priceToBook?: string;
+    priceToSales?: string;
+    forwardPE?: string;
+  };
+  technicals: {
+    fiftyDayMA?: string | number;
+    twoHundredDayMA?: string | number;
+    relativeStrengthIndex?: string;
+    macdSignal?: string;
+    supportLevels?: string;
+    resistanceLevels?: string;
+  };
+  sentiment: Record<string, string | number | {
+    current: string | number;
+    sevenDaysAgo: string | number;
+    thirtyDaysAgo: string | number;
+    sixtyDaysAgo: string | number;
+    ninetyDaysAgo: string | number;
+  }>;
   news: NewsItem[];
-  insiderActivity: any[];
+  insiderActivity: Record<string, unknown>[];
   analystOpinions: AnalystOpinion[];
-  peerComparison: any[];
+  peerComparison: Record<string, unknown>[];
   historicalTrend?: HistoricalDataItem[];
   priceTargets: {
     mean: number | string;
@@ -76,6 +100,85 @@ interface AnalysisParams {
   risk: string;
   investmentAmount: string;
   tradingStyle: string;
+}
+
+interface QuoteSummaryResponse {
+  price?: {
+    symbol?: string;
+    longName?: string;
+    shortName?: string;
+    regularMarketPrice?: number;
+    regularMarketChange?: number;
+    regularMarketChangePercent?: number;
+    marketCap?: number;
+    sector?: string;
+    industry?: string;
+  };
+  summaryDetail?: {
+    trailingPE?: number;
+    fiftyTwoWeekLow?: number;
+    fiftyTwoWeekHigh?: number;
+    averageVolume?: number;
+    dividendRate?: number;
+    dividendYield?: number;
+    beta?: number;
+    forwardPE?: number;
+    priceToSalesTrailing12Months?: number;
+    fiftyDayAverage?: number;
+    twoHundredDayAverage?: number;
+  };
+  defaultKeyStatistics?: {
+    trailingPE?: number;
+    targetPrice?: number;
+    targetMeanPrice?: number;
+    targetHighPrice?: number;
+    targetLowPrice?: number;
+    numberOfAnalystOpinions?: number;
+    shortRatio?: number;
+    earningsDate?: number;
+    trailingEps?: number;
+    forwardEps?: number;
+    priceToBook?: number;
+    revenuePerShare?: number;
+    returnOnEquity?: number;
+    profitMargins?: number;
+    revenueGrowth?: number;
+    earningsGrowth?: number;
+    debtToEquity?: number;
+    currentRatio?: number;
+    quickRatio?: number;
+  };
+  recommendationTrend?: {
+    trend?: Array<{
+      strongBuy?: string;
+    }>;
+  };
+  upgradeDowngradeHistory?: {
+    history?: UpgradeHistoryItem[];
+  };
+  earningsTrend?: {
+    trend?: Array<{
+      earningsEstimate?: {
+        avg?: number;
+      };
+      revenueEstimate?: {
+        avg?: number;
+      };
+      epsTrend?: {
+        current?: number;
+        '7daysAgo'?: number;
+        '30daysAgo'?: number;
+        '60daysAgo'?: number;
+        '90daysAgo'?: number;
+      };
+    }>;
+  };
+  financialData?: {
+    revenueGrowth?: number;
+    profitGrowth?: number;
+    freeCashflow?: number;
+    totalDebt?: number;
+  };
 }
 
 // Create OpenAI client with OpenRouter base URL
@@ -128,7 +231,7 @@ export async function GET(request: Request) {
       revenuePerShare: 'N/A'
     } as StockInfo;
 
-    let detailedData: DetailedData = {
+    const detailedData: DetailedData = {
       fundamentals: {},
       technicals: {},
       sentiment: {},
@@ -158,7 +261,7 @@ export async function GET(request: Request) {
       );
 
       if (quoteSummaryResponse.status === 200 && quoteSummaryResponse.data) {
-        const { price, summaryDetail, defaultKeyStatistics, recommendationTrend, upgradeDowngradeHistory, earningsTrend, financialData } = quoteSummaryResponse.data;
+        const { price, summaryDetail, defaultKeyStatistics, recommendationTrend, upgradeDowngradeHistory, earningsTrend, financialData } = quoteSummaryResponse.data as QuoteSummaryResponse;
 
         // Update stock info with actual data
         stockInfo = {
@@ -209,7 +312,7 @@ export async function GET(request: Request) {
           resistanceLevels: 'N/A'
         };
 
-        detailedData.analystOpinions = upgradeDowngradeHistory?.history?.slice(0, 5).map((item: any) => ({
+        detailedData.analystOpinions = upgradeDowngradeHistory?.history?.slice(0, 5).map((item: UpgradeHistoryItem) => ({
           firm: item.firm,
           toGrade: item.toGrade,
           fromGrade: item.fromGrade,
@@ -374,18 +477,18 @@ export async function GET(request: Request) {
         timestamp: new Date().toISOString()
       });
     } catch (error) {
-      const openaiError = error as Error;
+      const openaiError = error as OpenAIError;
       console.error('OpenRouter API error:', openaiError);
       return NextResponse.json({
         error: 'Failed to communicate with AI service',
         details: openaiError.message || String(openaiError),
       }, { status: 503 });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('AI Stock Analysis error:', error);
     return NextResponse.json({
       error: 'Failed to generate stock analysis',
-      details: error.message || String(error)
+      details: error instanceof Error ? error.message : String(error)
     }, { status: 500 });
   }
 }
@@ -422,7 +525,6 @@ function createAnalysisPrompt({
   };
 
   const timeFrame = horizonMap[horizon as keyof typeof horizonMap] || 'within the appropriate time horizon';
-  const riskProfile = riskMap[risk as keyof typeof riskMap] || 'appropriate risk level';
   const tradingGuidance = tradingStyleGuidance[tradingStyle as keyof typeof tradingStyleGuidance] || 'suitable trading approach';
 
   // Format technical indicators if available
@@ -593,7 +695,7 @@ function getTodayFormatted(): string {
   return new Date().toISOString().split('T')[0];
 }
 
-function processHistoricalData(data: any[]): HistoricalDataItem[] {
+function processHistoricalData(data: RawHistoricalDataItem[]): HistoricalDataItem[] {
   if (!data || !Array.isArray(data)) return [];
 
   return data.map(item => ({
@@ -702,4 +804,22 @@ function formatFinancialValue(value: number): string {
   if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
   if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
   return `$${value.toFixed(2)}`;
+}
+
+interface UpgradeHistoryItem {
+  firm: string;
+  toGrade: string;
+  fromGrade?: string;
+  epochGradeDate: number;
+}
+
+interface OpenAIError extends Error {
+  status?: number;
+  message: string;
+}
+
+interface RawHistoricalDataItem {
+  date: string | number;
+  close: string | number;
+  volume: string | number;
 }

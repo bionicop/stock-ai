@@ -15,7 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`antialiased dark vsc-initialized-cz-shortcut-listen="true"`}
+        className={`antialiased dark`}
       >
         <AuthProvider>
           {children}

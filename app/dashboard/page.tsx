@@ -26,8 +26,33 @@ import {
   RefreshCw,
 } from "lucide-react";
 
+interface MarketIndex {
+  shortName: string;
+  price: number;
+  changePercent: number;
+}
+
+interface NewsItem {
+  title: string;
+  publisher: string;
+  link: string;
+}
+
+interface TrendingStock {
+  symbol: string;
+  shortName: string;
+  price: number;
+  changePercent: number;
+}
+
+interface MarketData {
+  indices?: MarketIndex[];
+  news?: NewsItem[];
+  trending?: TrendingStock[];
+}
+
 export default function Dashboard() {
-  const [marketData, setMarketData] = useState<any>({});
+  const [marketData, setMarketData] = useState<MarketData>({});
   const [isLoading, setIsLoading] = useState(true);
   const supabase = createClientComponentClient();
   const [username, setUsername] = useState<string>("");
@@ -55,7 +80,7 @@ export default function Dashboard() {
     };
 
     fetchData();
-  }, []);
+  }, [supabase.auth]);
 
   // Format market time
   const formatMarketTime = () => {
@@ -76,7 +101,7 @@ export default function Dashboard() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold">Welcome {username ? `, ${username}` : 'to Stock AI'}</h1>
-            <p className="text-muted-foreground">Here's your market overview</p>
+            <p className="text-muted-foreground">Here&apos;s your market overview</p>
           </div>
           <div className="flex items-center gap-3">
             <Badge variant="outline" className="bg-primary/10 text-primary flex items-center gap-1">
