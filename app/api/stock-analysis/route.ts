@@ -407,11 +407,11 @@ export async function GET(request: Request) {
 
     try {
       const completion = await openai.chat.completions.create({
-        model: "deepseek/deepseek-r1:free", // Consider testing different models for quality
+        model: "deepseek/deepseek-r1:free",
         messages: [{ role: "user", content: prompt }],
         max_tokens: 4500,
-        temperature: 0.5, // Lower temperature for more consistent responses
-        response_format: { type: "json_object" }, // Request JSON format
+        temperature: 0.5,
+        response_format: { type: "json_object" },
       });
 
       // Extract the generated JSON and handle markdown formatting
@@ -507,13 +507,6 @@ function createAnalysisPrompt({
     'short': 'within 1-3 months',
     'medium': 'within 6-12 months',
     'long': 'over 1-5 years'
-  };
-
-  // Map risk tolerance to descriptions
-  const riskMap: Record<string, string> = {
-    'low': 'conservative investment approach prioritizing capital preservation',
-    'moderate': 'balanced approach accepting moderate price volatility for growth',
-    'high': 'aggressive approach accepting significant volatility for potential high returns'
   };
 
   // Trading style guidance
