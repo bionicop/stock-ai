@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import yahooFinance from 'yahoo-finance2';
+import { getChartData } from '@/lib/yahoo/yahooFinanceCache';
 
 export async function GET(request: Request) {
   try {
@@ -12,36 +12,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Symbol is required' }, { status: 400 });
     }
 
-    // Calculate date range based on the requested range
-    const endDate = new Date();
-    const startDate = new Date();
-
-    // Set start date based on range parameter
-    switch (range) {
-      case '1mo':
-        startDate.setMonth(endDate.getMonth() - 1);
-        break;
-      case '3mo':
-        startDate.setMonth(endDate.getMonth() - 3);
-        break;
-      case '6mo':
-        startDate.setMonth(endDate.getMonth() - 6);
-        break;
-      case '1y':
-        startDate.setFullYear(endDate.getFullYear() - 1);
-        break;
-      default:
-        startDate.setMonth(endDate.getMonth() - 3);
-    }
-
-    // Configure the query options with required period1 and period2 parameters
-    const queryOptions = {
-      interval,
-      period1: startDate,
-      period2: endDate
-    };
-
-    const result = await yahooFinance.chart(symbol, queryOptions);
+    const result = await getChartData(symbol, range, interval);
 
     return NextResponse.json(result);
   } catch (error) {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import axios from 'axios';
+import { getQuoteSummary, getStockDetails, getChartData } from '@/lib/yahoo/yahooFinanceCache';
 
 interface StockInfo {
   symbol: string;
@@ -254,16 +254,19 @@ export async function GET(request: Request) {
     };
 
     try {
-      // Fetch basic stock data
-      const quoteSummaryResponse = await axios.get(
-        `${url.origin}/api/yahoo-finance/quote-summary?symbol=${symbol}&modules=price,summaryDetail,defaultKeyStatistics,recommendationTrend,upgradeDowngradeHistory,earningsTrend,financialData`,
-        { timeout: 5000 }
-      );
+      const quoteSummaryData = await getQuoteSummary(symbol, [
+        'price',
+        'summaryDetail',
+        'defaultKeyStatistics',
+        'recommendationTrend',
+        'upgradeDowngradeHistory',
+        'earningsTrend',
+        'financialData'
+      ]);
 
-      if (quoteSummaryResponse.status === 200 && quoteSummaryResponse.data) {
-        const { price, summaryDetail, defaultKeyStatistics, recommendationTrend, upgradeDowngradeHistory, earningsTrend, financialData } = quoteSummaryResponse.data as QuoteSummaryResponse;
+      if (quoteSummaryData) {
+        const { price, summaryDetail, defaultKeyStatistics, recommendationTrend, upgradeDowngradeHistory, earningsTrend, financialData } = quoteSummaryData;
 
-        // Update stock info with actual data
         stockInfo = {
           symbol: price?.symbol || symbol,
           name: price?.longName || price?.shortName || symbol,
@@ -348,43 +351,36 @@ export async function GET(request: Request) {
         };
       }
 
-      // Fetch historical data for price trends
-      const historicalResponse = await axios.get(
-        `${url.origin}/api/yahoo-finance/historical?symbol=${symbol}&period1=${getDateXMonthsAgo(12)}&period2=${getTodayFormatted()}&interval=1mo`,
-        { timeout: 5000 }
-      );
-
-      if (historicalResponse.status === 200 && historicalResponse.data) {
-        detailedData.historicalTrend = processHistoricalData(historicalResponse.data);
-      }
-
-      // Fetch insights
-      const insightsResponse = await axios.get(
-        `${url.origin}/api/yahoo-finance/insights?symbol=${symbol}`,
-        { timeout: 5000 }
-      );
-
-      if (insightsResponse.status === 200 && insightsResponse.data) {
-        detailedData.sentiment = {
-          ...detailedData.sentiment,
-          companyOutlook: insightsResponse.data.companyOutlook || 'N/A',
-          sectorOutlook: insightsResponse.data.sectorOutlook || 'N/A',
-          recommendation: insightsResponse.data.recommendation || 'N/A'
-        };
-      }
-
-      // Fetch news headlines
+      // Fetch historical data for price trends using our cached chart data
       try {
-        const newsResponse = await axios.get(
-          `${url.origin}/api/news?symbol=${symbol}&limit=5`,
-          { timeout: 5000 }
-        );
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setMonth(endDate.getMonth() - 12);
 
-        if (newsResponse.status === 200 && newsResponse.data) {
-          detailedData.news = newsResponse.data.items || [];
+        const chartData = await getChartData(symbol, '1y', '1mo');
+
+        if (chartData && chartData.quotes) {
+          detailedData.historicalTrend = chartData.quotes.map((quote: any) => ({
+            date: String(quote.date),
+            close: Number(quote.close),
+            volume: Number(quote.volume || 0)
+          }));
         }
       } catch (error) {
-        console.error('Error fetching news:', error);
+        console.error('Error fetching historical data:', error);
+      }
+
+      // Fetch stock details for news
+      try {
+        const stockDetails = await getStockDetails(symbol);
+        if (stockDetails && stockDetails.news) {
+          detailedData.news = stockDetails.news.slice(0, 10).map((item: any) => ({
+            title: item.title,
+            date: new Date(item.providerPublishTime * 1000).toLocaleDateString()
+          }));
+        }
+      } catch (error) {
+        console.error('Error fetching stock details:', error);
       }
 
     } catch (error) {
@@ -429,7 +425,6 @@ export async function GET(request: Request) {
       } catch (jsonError) {
         console.error('Error parsing JSON response:', jsonError);
         // Fall back to text format and parse manually
-        // Create a structured fallback from the parsed sections
         const sections = formatAnalysisIntoSections(analysisText);
         analysisData = {
           summary: {

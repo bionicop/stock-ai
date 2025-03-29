@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
-import yahooFinance from 'yahoo-finance2';
+import { getSearch } from '@/lib/yahoo/yahooFinanceCache';
 
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const query = url.searchParams.get('query');
     const category = url.searchParams.get('category') || 'stocks';
+    const newsCount = parseInt(url.searchParams.get('newsCount') || '5', 10);
 
     if (!query) {
       return NextResponse.json(
@@ -14,8 +15,8 @@ export async function GET(request: Request) {
       );
     }
 
-    // Search for stocks, ETFs, indices, etc.
-    const searchResults = await yahooFinance.search(query);
+    // Use our caching service to get search results
+    const searchResults = await getSearch(query, category, newsCount);
 
     let filteredResults = [];
 
@@ -28,9 +29,7 @@ export async function GET(request: Request) {
         break;
 
       case 'news':
-        // Fetch news related to the search query with increased count
-        const newsResults = await yahooFinance.search(query, { newsCount: 30 });
-        filteredResults = newsResults.news?.map(item => ({
+        filteredResults = searchResults.news?.map(item => ({
           symbol: item.publisher,
           name: item.title,
           type: 'News',
@@ -46,33 +45,20 @@ export async function GET(request: Request) {
         break;
 
       case 'crypto':
-        // Try to get cryptocurrency results
-        // First, add common crypto suffix if not present
-        let cryptoQuery = query;
-        if (!cryptoQuery.toUpperCase().includes('-USD') &&
-            !cryptoQuery.toUpperCase().endsWith('USD')) {
-          cryptoQuery = `${cryptoQuery}-USD`;
-        }
+        filteredResults = searchResults.quotes?.filter(q =>
+          q.quoteType === 'CRYPTOCURRENCY'
+        ) || [];
 
-        try {
-          // Try direct lookup for popular cryptos
-          const cryptoResults = await yahooFinance.search(cryptoQuery);
-          const cryptoQuotes = cryptoResults.quotes?.filter(q =>
-            q.quoteType === 'CRYPTOCURRENCY'
-          ) || [];
-
-          if (cryptoQuotes.length > 0) {
-            filteredResults = cryptoQuotes;
-          } else {
-            // If no direct match, search for general crypto results
-            const generalCryptoResults = await yahooFinance.search('crypto');
+        // If no results, try to get general crypto results
+        if (filteredResults.length === 0) {
+          try {
+            const generalCryptoResults = await getSearch('crypto', 'stocks');
             filteredResults = generalCryptoResults.quotes?.filter(q =>
               q.quoteType === 'CRYPTOCURRENCY'
             ).slice(0, 10) || [];
+          } catch (error) {
+            console.error('Crypto search error:', error);
           }
-        } catch (error) {
-          console.error('Crypto search error:', error);
-          filteredResults = [];
         }
         break;
 
